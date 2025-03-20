@@ -2,8 +2,7 @@ version: "3.4"
 
 services:
   fastapi:
-    # build: ./app_fastapi/
-    image: ghcr.io/blueswen/opentelemetry-apm/fastapi:latest
+    build: ./app_fastapi/
     ports:
       - "8000:8000"
     environment:
