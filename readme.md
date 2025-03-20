@@ -1,4 +1,4 @@
-# OpenTelemetry Application Performance Management
+# Observability with Otel Collector
 
 Monitoring application performance with OpenTelemetry SDK, OpenTelemetry Collector, Prometheus, and Grafana:
 
@@ -8,9 +8,23 @@ Monitoring application performance with OpenTelemetry SDK, OpenTelemetry Collect
 4. Grafana: Visualize metrics
 5. Tempo: Collect traces, optional for the main goal to process traces to metrics
 
+Note: I have not included logs in this project. For logs you can configure logger in every service and set the Otel Collector yaml file to scrape those logs.
+
+## Kick Start
+
+This is a demo project setup which can be used a blueprint for setting up Observability on a wide K8 Cluster containing multiple services.
+Steps:
+
+- Each service is instrumented with required Libraries.
+- Certain set of built-in environemnt variables are set for every service. They are responsible for exporting of logs, traces and metrics
+- OtelCollector is configured to scrape them from every service, it is deployed as a Pod in itself.
+- In OtelCollector, tools like Loki, Prometheus and Tempo are configured.
+- They are added as Data Sources in Grafana and configured appropriately to have proper correlation
+
+I have referred to this resource : https://opentelemetry.io/docs/demo/architecture/
+
 ![APM Architecture](./images/apm-arch.jpg)
 
-This project is inspired by [Jaeger Service Performance Monitoring](https://www.jaegertracing.io/docs/1.47/spm/).
 
 ## Quick Start
 
@@ -56,47 +70,8 @@ OpenTelemetry provides two ways to instrument your application:
 
 In this project, we use zero-code instrumentation to instrument the applications.
 
-#### Java - Spring Boot
-
-[OpenTelemetry Instrumentation for Java](https://github.com/open-telemetry/opentelemetry-java-instrumentation) provides an [zero-code way](https://opentelemetry.io/docs/zero-code/java/agent/)(Java 1.8+ is required) to instrument the application by the agent jar as follows:
-
-```bash
-java -javaagent:path/to/opentelemetry-javaagent.jar -jar myapp.jar
-```
-
-The agent supports a lot of [libraries](https://github.com/open-telemetry/opentelemetry-java-instrumentation/blob/main/docs/supported-libraries.md), including Spring Web MVC. According to the document:
-
-> It can be used to capture telemetry data at the “edges” of an app or service, such as inbound requests, outbound HTTP calls, database calls, and so on.
-
-So we don't need to modify any line of code in our codebase. The agent will handle everything automatically.
-
-The configurations, like the exporter setting, are listed on the [document](https://opentelemetry.io/docs/languages/java/configuration/), and are consumed by the agent from one or more of the following sources (ordered from highest to lowest priority):
-
-- system properties
-- environment variables
-- the configuration file
-- the [ConfigPropertySource](https://opentelemetry.io/docs/languages/java/configuration/#customizing-the-opentelemetry-sdk) SPI
-
-In this project we use environment variables to set the agent configuration:
-
-```yaml
-# docker-compose.yml
-spring-boot:
-  image: ghcr.io/blueswen/opentelemetry-apm/springboot:latest
-  environment:
-    - OTEL_EXPORTER=otlp_span
-    - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
-    - OTEL_EXPORTER_OTLP_INSECURE=true
-    - OTEL_METRICS_EXPORTER=none
-    - OTEL_RESOURCE_ATTRIBUTES=service.name=sprint-boot
-  command: "java -javaagent:/opentelemetry-javaagent.jar -jar /app.jar"
-```
-
-Check [Spring Boot with Observability](https://github.com/blueswen/spring-boot-observability) for more details, if you are interested in Spring Boot with Observability.
 
 #### Python - FastAPI
-
-[OpenTelemetry Instrumentation for Python](https://github.com/open-telemetry/opentelemetry-python-contrib/tree/main/opentelemetry-instrumentation) provides an [zero-code way](https://opentelemetry.io/docs/zero-code/python/) for [multiple libraries and frameworks](https://github.com/open-telemetry/opentelemetry-python-contrib/tree/main/instrumentation) to instrument the application. With zero-code instrumentation, it will inject bytecode dynamically to gather telemetry.
 
 For using zero-code instrumentation, we need to install at least three packages:
 
@@ -109,7 +84,7 @@ For using zero-code instrumentation, we need to install at least three packages:
 There are two ways to set the configuration of OpenTelemetry Instrumentation for Python:
 
 1. [Environment variables](https://opentelemetry-python-contrib.readthedocs.io/en/latest/instrumentation/fastapi/fastapi.html#environment-variables)
-2. [CLI arguments](https://github.com/open-telemetry/opentelemetry-python-contrib/tree/main/opentelemetry-instrumentation#opentelemetry-instrument)
+2. CLI arguments
 
 In this project we use environment variables to set the zero-code instrumentation configuration:
 
@@ -136,57 +111,9 @@ opentelemetry-instrument \
     python main.py
 ```
 
-Check [FastAPI with Observability](https://github.com/blueswen/fastapi-observability) for more details, if you are interested in FastAPI with Observability.
-
-#### JavaScript - Express
-
-[OpenTelemetry Javascript Contrib](https://github.com/open-telemetry/opentelemetry-js-contrib) provides an [zero-code way](https://opentelemetry.io/docs/zero-code/js/) to instrument the application for multiple Node.js [frameworks and libraries](https://github.com/open-telemetry/opentelemetry-js-contrib/tree/main/metapackages/auto-instrumentations-node#supported-instrumentations).
-
-To use zero-code instrumentation, we need to install two packages:
-
-1. [@opentelemetry/api](https://www.npmjs.com/package/@opentelemetry/api)
-2. [@opentelemetry/auto-instrumentations-node](https://www.npmjs.com/package/@opentelemetry/auto-instrumentations-node): Zero-code instrumentation was formerly known as automatic instrumentation, so the package name is `auto-instrumentations-node`.
-
-Then, we can use the environment variables to config the zero-code instrumentation and use the `require` argument to load the auto-instrumentations:
-
-```bash
-export OTEL_TRACES_EXPORTER=otlp
-export OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
-export OTEL_EXPORTER_OTLP_PROTOCOL=grpc
-export OTEL_SERVICE_NAME=express
-node --require @opentelemetry/auto-instrumentations-node app.js
-```
-
-In this project we use environment variables to set the zero-code instrumentation configuration:
-
-```yaml
-# docker-compose.yml
-express:
-  image: ghcr.io/blueswen/opentelemetry-apm/express:latest
-  environment:
-    - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
-    - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
-    - OTEL_SERVICE_NAME=express
-  command: "node --require '@opentelemetry/auto-instrumentations-node/register' app.js"
-```
-
-Check more details about zero-code instrumentation in the [document](hhttps://opentelemetry.io/docs/zero-code/js/) and [GitHub Repo](https://github.com/open-telemetry/opentelemetry-js-contrib/tree/main/metapackages/auto-instrumentations-node#supported-instrumentations). The environment variables are listed in the [Java SDK configuration document](https://opentelemetry.io/docs/languages/java/configuration/).
-
-#### .NET
-
-Work in progress
-
-#### Laravel - PHP
-
-Work in progress
-
-#### Ruby on Rails - Ruby
-
-Work in progress
-
 ### OpenTelemetry Collector
 
-OpenTelemetry Collector is a vendor-agnostic agent for collecting telemetry data, which can receive different telemetry data formats and export them to different backends. In this project, we use OpenTelemetry Collector to receive traces from the applications over OTLP and process them to metrics with [Span Metrics Connector](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/connector/spanmetricsconnector/README.md).
+OpenTelemetry Collector is a vendor-agnostic agent for collecting telemetry data, which can receive different telemetry data formats and export them to different backends. In this project, we use OpenTelemetry Collector to receive traces from the applications over OTLP and process them to metrics with Span Metrics Connector
 
 [Contrib distribution of OpenTelemetry Collector](https://github.com/open-telemetry/opentelemetry-collector-contrib) is required for the Span Metrics Connector feature. OpenTelemetry Collector only has the core components, and the Contrib distribution provides additional components, including the Span Metrics Connector.
 
