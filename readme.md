@@ -254,6 +254,8 @@ grafana:
       GF_FEATURE_TOGGLES_ENABLE: "timeSeriesTable" # enable sparkline feature
 ```
 
+This repository is about to be privated.
+
 ## Reference
 
 1. [Official Jaeger with SPM docker compose example](https://github.com/jaegertracing/jaeger/tree/main/docker-compose/monitor)
